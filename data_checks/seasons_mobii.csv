@@ -1,0 +1,9 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+seasons,id,mobii,object,PK,0.0
+seasons,name,mobii,object,PK,0.0
+seasons,start_date,mobii,datetime64[ns],,0.0
+seasons,end_date,mobii,datetime64[ns],,0.0
+seasons,games_supported,mobii,bool,,0.0
+seasons,hidden,mobii,bool,,0.0
+seasons,data_source,mobii,object,,0.0
+seasons,competition_id,mobii,object,,0.0

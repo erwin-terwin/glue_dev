@@ -1,0 +1,4 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+sports,id,mobii,object,PK,0.0
+sports,name,mobii,object,PK,0.0
+sports,games_supported,mobii,bool,,0.0

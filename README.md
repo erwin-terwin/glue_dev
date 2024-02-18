@@ -1,2 +1,1 @@
-# glue_dev
-Private Glue Jobs Dev
+# aws_glue_personal_dev

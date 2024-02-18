@@ -1,0 +1,5 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+competitions,id,mobii,object,PK,0.0
+competitions,sport_id,mobii,object,PK,0.0
+competitions,organization_id,mobii,object,,0.0
+competitions,name,mobii,object,PK,0.0
