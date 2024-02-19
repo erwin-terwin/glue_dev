@@ -50,7 +50,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option=''
+option='qa'
 if option=='prod':
 
     pg_config = {
@@ -63,10 +63,10 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_analytics_qa',
+        'dbname': 'athstat_games',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
-        'host': 'ec2-44-202-156-120.compute-1.amazonaws.com',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
 
@@ -271,7 +271,25 @@ standard_pbp_action_names_dict=standard_pbp_action_names.set_index(data_source_c
 standard_action_names_df=standard_action_names_df[[data_source_column,'Athstat action']]
 standard_action_names_dict=standard_action_names_df.set_index(data_source_column).to_dict()['Athstat action']
 
+#get game_status_mapping.csv from bucket and folder data_maps on S3 
+game_status_mapping_path="data_maps/game_status_mapping.csv"
+game_status_mapping_file=read_s3_file(bucket_name=bucket_name, file_name=game_status_mapping_path)
+game_status_mapping_df=pd.read_csv(io.StringIO(game_status_mapping_file),sep=',')
+#select data_source=mobii and athstat and athstat_abbreviation columns
+game_status_mapping_df=game_status_mapping_df[['mobii','athstat','athstat_abbreviation']]
+game_status_dict_df=game_status_mapping_df[['mobii','athstat']]
+#create dict
+game_status_dict=game_status_dict_df.set_index('mobii').to_dict()['athstat']
 
+
+#read rugby_15s_position_ontology.csv
+rugby_15s_position_ontology_path="data_maps/rugby_15s_position_ontology.csv"
+rugby_15s_position_ontology_file=read_s3_file(bucket_name=bucket_name, file_name=rugby_15s_position_ontology_path)
+rugby_15s_position_ontology_df=pd.read_csv(io.StringIO(rugby_15s_position_ontology_file),sep=',')
+#choose mlr and athstat_position
+rugby_15s_position_ontology_df=rugby_15s_position_ontology_df[['mlr','athstat_position']]
+#create position_ontology_dict
+position_ontology_dict=rugby_15s_position_ontology_df.set_index('mlr').to_dict()['athstat_position']
 
 #------------------------------------------- processing the games -----------------------------------------------
 
@@ -281,6 +299,7 @@ game_ids=list(games_dictionary.keys())
 
 counter=0
 Failed_Files_List=[]
+failure_dict={}
 start_time=datetime.now()
 for game_id in game_ids:
     print('\n')
@@ -324,6 +343,10 @@ for game_id in game_ids:
         roundName=match_results_json['roundName']
         venueName=match_results_json['venueName']
         status=match_results_json['status']
+        #map status to athstat status
+        status=game_status_dict.get(status)
+
+
         referees=match_results_json['referees']
         seriesName=match_results_json['seriesName']
         teams=match_results_json['teams']
@@ -384,7 +407,10 @@ for game_id in game_ids:
             'name':sport_name,
             'games_supported':True
         }
-
+        if year=='2023':
+            hidden=True
+        else:
+            hidden=False
 
         #competition
         competition={
@@ -398,7 +424,7 @@ for game_id in game_ids:
         #season dict
         season_dict={
             "id":generate_uuid(seasonId,data_source=data_source),
-            "name":league_name,
+            "name":league_name+ ' ' +seasonName,
             "start_date":season_start_date,
             "end_date":season_end_date,
             "data_source":data_source,
@@ -408,7 +434,7 @@ for game_id in game_ids:
 
 
         leagues_dict={
-            "id":generate_uuid(seasonId,data_source=data_source),
+            "id":generate_uuid(seasonId,data_source=data_source), #not a good idea to use season id as league id
             "name":league_name,
             "season_id":generate_uuid(seasonId,data_source=data_source),
             "start_date":season_start_date,
@@ -444,7 +470,7 @@ for game_id in game_ids:
         }
 
         all_teams=[teams_dict_home,teams_dict_away]
-
+        
 
         games_seasons_dict={
             "game_id":generate_uuid(game_id,data_source=data_source),
@@ -458,6 +484,7 @@ for game_id in game_ids:
             "league_id":generate_uuid(seasonId,data_source=data_source),
             "round":roundNumber,
             "game_status":status,
+            'result':True
 
         }
 
@@ -547,9 +574,10 @@ for game_id in game_ids:
                     "athstat_middleinitial":None,
                     "team_id":generate_uuid(team_id,data_source=data_source),
                     "gender":'M',
-                    "position_class":None,
+                    "position_class":None,#important one
                     "data_source":data_source,
-                    "position":stats.get('startingNumber'),
+                    "position":position_ontology_dict[stats.get('startingNumber')],#important one to map
+                    #question how does something like replacement end up with an Xp rating?
 
                 }
 
@@ -560,6 +588,7 @@ for game_id in game_ids:
                 })
 
                 roster_dict={
+                    "_id":generate_uuid(generate_uuid(stats.get('playerId'),game_id),data_source=data_source),
                     "player_number":stats.get('startingNumber'),
                     "athlete_id":generate_uuid(stats.get('playerId'),data_source=data_source),
                     "team_id":generate_uuid(team_id,data_source=data_source),
@@ -722,7 +751,7 @@ for game_id in game_ids:
                             "game_id":generate_uuid(game_id,data_source=data_source),
                             "team_id":team_id,
                             "timestamp": timestamp_pbp,
-                            "game_time":matchTime,
+                            "game_time":matchTime,#minutes
                             "action":action_name_ontology,
                             "action_count":1,
                             "team_score":int(timeline_event.get("homeTeamScore")),
@@ -775,6 +804,7 @@ for game_id in game_ids:
         print('Error processing game '+str(game_id))
         print(e)
         Failed_Files_List.append(game_id)
+        failure_dict[game_id]=str(e)
         continue
     counter+=1
 

@@ -1,0 +1,3 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+teams_athletes,team_id,mobii,object,PK,0.0
+teams_athletes,athlete_id,mobii,object,PK,0.0

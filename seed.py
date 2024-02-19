@@ -28,7 +28,7 @@ logger.setLevel(logging.INFO)
 
 
 
-option=''
+option='qa'
 if option=='prod':
 
     pg_config = {
@@ -41,10 +41,10 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_analytics_qa',
+        'dbname': 'athstat_games_qa_review',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
-        'host': 'ec2-44-202-156-120.compute-1.amazonaws.com',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
 
@@ -66,6 +66,8 @@ else:
         'host': 'localhost',
         'port': 5432
     }
+
+
 
 
 

@@ -155,4 +155,4 @@ while True:
         previous_length = len(df)
     # Wait for 30 seconds before the next iteration\
     print('Wating for udpate !')
-    time.sleep(30)
+    

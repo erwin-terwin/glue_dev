@@ -18,7 +18,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option='qa'
+option=''
 if option=='prod':
     pg_config = {
     'dbname': 'athstat_analytics_prod',
@@ -37,7 +37,7 @@ elif option=='qa':
     }
 else:
     pg_config = {
-        'dbname': 'athstat',
+        'dbname': 'local_rds_prod',
         'user': 'postgres',
         'password': 'example',
         'host': 'localhost',

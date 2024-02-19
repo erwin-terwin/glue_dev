@@ -1,0 +1,20 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+games_seasons,game_id,mobii,object,PK,0.0
+games_seasons,team_score,mobii,int64,,0.0
+games_seasons,opposition_score,mobii,int64,,0.0
+games_seasons,venue,mobii,object,,0.0
+games_seasons,kickoff_time,mobii,object,,0.0
+games_seasons,competition_name,mobii,object,,0.0
+games_seasons,team_id,mobii,object,PK,0.0
+games_seasons,opposition_team_id,mobii,object,,0.0
+games_seasons,is_knockout,mobii,object,,100.0
+games_seasons,is_league_managed,mobii,object,,100.0
+games_seasons,location,mobii,object,,100.0
+games_seasons,extra_info,mobii,object,,100.0
+games_seasons,hidden,mobii,bool,,0.0
+games_seasons,league_id,mobii,object,PK,0.0
+games_seasons,round,mobii,object,,0.0
+games_seasons,network,mobii,object,,100.0
+games_seasons,game_status,mobii,object,,0.0
+games_seasons,game_clock,mobii,object,,100.0
+games_seasons,result,mobii,object,,100.0

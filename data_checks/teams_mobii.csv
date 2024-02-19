@@ -1,0 +1,14 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+teams,athstat_id,mobii,object,PK,0.0
+teams,source_id,mobii,object,PK,0.0
+teams,athstat_name,mobii,object,,0.0
+teams,data_source,mobii,object,,0.0
+teams,source_abbreviation,mobii,object,,0.0
+teams,athstat_abbreviation,mobii,object,,0.0
+teams,possible_names,mobii,object,,0.0
+teams,sport_id,mobii,object,PK,0.0
+teams,organization_id,mobii,object,,0.0
+teams,hidden,mobii,bool,,0.0
+teams,on_dark_image_url,mobii,object,,100.0
+teams,on_light_image_url,mobii,object,,100.0
+teams,image_url,mobii,object,,0.0

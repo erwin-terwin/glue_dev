@@ -50,7 +50,8 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option=''
+
+option='qa'
 if option=='prod':
 
     pg_config = {
@@ -63,23 +64,22 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_analytics_qa',
+        'dbname': 'athstat_games_qa_review',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
-        'host': 'ec2-44-202-156-120.compute-1.amazonaws.com',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
 
 
-elif option=='review':
-        pg_config = {
-        'dbname': 'prod_review_delete',
+elif option=='athstat_games':
+    pg_config = {
+        'dbname': 'athstat_games',
         'user': 'postgres',
-        'password': 'J4VGzZwjfrcymkasdAsdkA',
-        'host': 'athstat-analytics-prod-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
+        'password': 'n4fn8s0Ffn4ssPx9Ujn4',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
-
 else:
     pg_config = {
         'dbname': 'local_rds_prod',
@@ -88,6 +88,8 @@ else:
         'host': 'localhost',
         'port': 5432
     }
+
+
 
 
 
@@ -357,4 +359,4 @@ for index, row in df.iterrows():
     print('\n')
 
     print('sleeping for',delay_time)
-    time.sleep(delay_time)
+    #time.sleep(delay_time)

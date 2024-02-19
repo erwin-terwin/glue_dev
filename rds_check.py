@@ -15,9 +15,8 @@ Writes to the following tables:
 - teams_athletes
 - game_roster
 - sports_action
-- team_pbp_actions
-- player_pbp_actions
 - sports_action_pbp
+- sports_action_pbp_live
 
 
 
@@ -230,3 +229,81 @@ duplicate_seasons=check_pandas_df_duplicates(df)
 #leagues
 table_name='leagues'
 df=read_table_into_dataframe(pg_config, table_name)
+df_check_leagues=analyze_table(pg_config, table_name, data_source)
+#check duplicates
+duplicate_leagues=check_pandas_df_duplicates(df)
+
+
+#teams
+table_name='teams'
+df=read_table_into_dataframe(pg_config, table_name)
+#filter data_source
+df=df[df['data_source']==data_source]
+df_check_teams=analyze_table(pg_config, table_name, data_source)
+#check duplicates
+duplicate_teams=check_pandas_df_duplicates(df)
+
+
+#games_seasons
+table_name='games_seasons'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_games_seasons=analyze_table(pg_config, table_name, data_source)
+
+
+#team_actions
+table_name='team_actions'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_team_actions=analyze_table(pg_config, table_name, data_source)
+duplicate_team_actions=check_pandas_df_duplicates(df)
+
+
+
+#athletes
+table_name='athletes'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_athletes=analyze_table(pg_config, table_name, data_source)
+duplicate_athletes=check_pandas_df_duplicates(df)
+
+
+#teams_athletes
+table_name='teams_athletes'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_teams_athletes=analyze_table(pg_config, table_name, data_source)
+duplicate_teams_athletes=check_pandas_df_duplicates(df)
+
+#game_roster
+table_name='game_roster'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_game_roster=analyze_table(pg_config, table_name, data_source)
+duplicate_game_roster=check_pandas_df_duplicates(df)
+
+
+#sports_action
+table_name='sports_action'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_sports_action=analyze_table(pg_config, table_name, data_source)
+duplicate_sports_action=check_pandas_df_duplicates(df)
+
+
+#team_pbp_actions
+table_name='sports_action_pbp'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_sports_action_pbp=analyze_table(pg_config, table_name, data_source)
+duplicate_sports_action_pbp=check_pandas_df_duplicates(df)
+
+
+
+#sport_action_pbp_live
+table_name='sports_action_pbp_live'
+df=read_table_into_dataframe(pg_config, table_name)
+#check
+df_check_sports_action_pbp_live=analyze_table(pg_config, table_name, data_source)
+
+

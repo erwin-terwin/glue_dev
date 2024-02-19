@@ -1,0 +1,9 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+sports_action,action,mobii,object,PK,0.0
+sports_action,game_id,mobii,object,PK,0.0
+sports_action,athlete_id,mobii,object,PK,0.0
+sports_action,action_count,mobii,float64,,0.0
+sports_action,team_id,mobii,object,PK,0.0
+sports_action,hidden,mobii,object,PK,100.0
+sports_action,points,mobii,object,,100.0
+sports_action,data_source,mobii,object,,0.0

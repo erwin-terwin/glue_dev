@@ -1,0 +1,9 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+sports_action_pbp_live,game_id,mobii,object,PK,
+sports_action_pbp_live,team_id,mobii,object,PK,
+sports_action_pbp_live,timestamp,mobii,object,PK,
+sports_action_pbp_live,game_time,mobii,object,,
+sports_action_pbp_live,action,mobii,object,PK,
+sports_action_pbp_live,action_count,mobii,object,,
+sports_action_pbp_live,team_score,mobii,object,PK,
+sports_action_pbp_live,opposition_score,mobii,object,PK,

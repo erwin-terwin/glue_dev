@@ -1,0 +1,9 @@
+Table,Fieldname,Data Source,Datatype,Key,Percentage Null values
+game_roster,_id,mobii,object,,100.0
+game_roster,player_number,mobii,int64,,0.0
+game_roster,is_captain,mobii,object,,100.0
+game_roster,is_substitute,mobii,object,,100.0
+game_roster,game_id,mobii,object,PK,0.0
+game_roster,team_id,mobii,object,PK,0.0
+game_roster,athlete_id,mobii,object,PK,0.0
+game_roster,position,mobii,object,,0.0
