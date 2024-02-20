@@ -51,7 +51,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option='qa'
+option=''
 if option=='prod':
 
     pg_config = {
@@ -278,85 +278,120 @@ standard_action_names_dict=standard_action_names_df.set_index(data_source_column
 
 
 #pick random game in games dictionary
-game_id=list(games_dictionary.keys())[0]
+game_ids=list(games_dictionary.keys())
+game_ids=game_ids[0:1]
+FAILED=[]
+ACTIONS=[]
+GAME_ACTIONS=[]
 
-match_time_line_json_path=games_dictionary[game_id]['match_timeline']
-
-
-response = s3_client.get_object(Bucket=bucket_name, Key=match_time_line_json_path)
-json_string = response['Body'].read().decode('utf-8')
-json_data = json.loads(json_string)
-import pandas as pd
-
-# Assuming json_data is a list of dictionaries
-# Replace json_data with your actual data
-
-# Convert the list of dictionaries to a Pandas DataFrame
-df = pd.DataFrame(json_data)
-
-# Print or use the DataFrame as needed
-print(df)
-#sprt by timeOfDay ASC
-df.sort_values(by=['timeOfDay'], inplace=True, ascending=True)
-
-#convert to utc
-
-#sprt by matchTimeMs
-df.sort_values(by=['matchTimeMs'], inplace=True, ascending=True)
-
-#game_time_seconds
-
-df['game_time_seconds']=(df['matchTimeMs']-df['matchTimeMs'].min())/1000
-
-# Assuming df is your DataFrame with 'game_time_seconds' and 'timeOfDay' columns
-#start rea cloclk at o
-real_time=0
-import time
-data_source='mobii'
-
-current_time=datetime.now()
-elapsed_time=0
-for index, row in df.iterrows():
-    print(row['game_time_seconds'], row['timeOfDay'])
-    game_time_seconds=row['game_time_seconds']
-    elapsed_time=game_time_seconds-real_time
-    real_time=game_time_seconds
-    delay_time=elapsed_time
-    game_actions=row['options']
-    print(game_actions)
-    homeTeamScore=row['homeTeamScore']
-    awayTeamScore=row['awayTeamScore']
-    team=row['team']
-    team_id=team['teamId']
-    athstat_team_id=generate_uuid(team_id,data_source)
-    playerOne=row['playerOne']
-    playerTwo=row['playerTwo']
-    timestamp=row['timeOfDay']
-    update_list=[]
-    action_keys=game_actions.keys()
-    action_name=row['name']
-    #remove whiute space
-    action_name=action_name.replace(" ", "")
-
-    update_dict={
-                "game_id":generate_uuid(game_id,data_source),
-                "team_id":generate_uuid(team_id,data_source),
-                "timestamp":timestamp,
-                "game_time":game_time_seconds,
-                "action":action_name,
-                "action_count":1,
-                "team_score":homeTeamScore,
-                "opposition_score":awayTeamScore,
-            }
-
-    update_list.append(update_dict)
-
+for game_id in game_ids:
+    print('Processing : ',game_id)
     try:
-        bulk_upsert_data(table='sports_action_pbp_live', data_dict=update_list, conflict_ids=['game_id','team_id','timestamp'],pg_config=pg_config)
-    except Exception as e:
-        print('Error',e)
+        match_time_line_json_path=games_dictionary[game_id]['match_timeline']
 
-    print('\n')
 
-    print('sleeping for',delay_time)
-    #time.sleep(delay_time)
+        response = s3_client.get_object(Bucket=bucket_name, Key=match_time_line_json_path)
+        json_string = response['Body'].read().decode('utf-8')
+        json_data = json.loads(json_string)
+        import pandas as pd
+
+        # Assuming json_data is a list of dictionaries
+        # Replace json_data with your actual data
+
+        # Convert the list of dictionaries to a Pandas DataFrame
+        df = pd.DataFrame(json_data)
+
+        # Print or use the DataFrame as needed
+        print(df)
+        #sprt by timeOfDay ASC
+        df.sort_values(by=['timeOfDay'], inplace=True, ascending=True)
+
+        #convert to utc
+
+        #sprt by matchTimeMs
+        df.sort_values(by=['matchTimeMs'], inplace=True, ascending=True)
+
+        #game_time_seconds
+
+        df['game_time_seconds']=(df['matchTimeMs']-df['matchTimeMs'].min())/1000
+
+        # Assuming df is your DataFrame with 'game_time_seconds' and 'timeOfDay' columns
+        #start rea cloclk at o
+        real_time=0
+        import time
+        data_source='mobii'
+
+        current_time=datetime.now()
+        elapsed_time=0
+        for index, row in df.iterrows():
+            print(row['game_time_seconds'], row['timeOfDay'])
+            game_time_seconds=row['game_time_seconds']
+            elapsed_time=game_time_seconds-real_time
+            real_time=game_time_seconds
+            delay_time=elapsed_time
+            game_actions=row['options']
+            try:
+                keys = list(game_actions.keys())
+                GAME_ACTIONS.extend([f'{key} {game_actions[key]}' for key in keys])
+
+
+            except:
+                pass
+            homeTeamScore=row['homeTeamScore']
+            awayTeamScore=row['awayTeamScore']
+            team=row['team']
+            team_id=team['teamId']
+            athstat_team_id=generate_uuid(team_id,data_source)
+            playerOne=row['playerOne']
+            playerTwo=row['playerTwo']
+            timestamp=row['timeOfDay']
+            update_list=[]
+            action_keys=game_actions.keys()
+            action_name=row['name']
+            if action_name=='Tackler Entry':
+                outcome=[game_actions[key] for key in keys]
+                outcome=outcome[0]
+                action_name=action_name+outcome
+
+            print(action_name)
+            #remove whiute space
+            action_name=action_name.replace(" ", "")
+            ACTIONS.append(action_name)
+
+            update_dict={
+                        "game_id":generate_uuid(game_id,data_source),
+                        "team_id":generate_uuid(team_id,data_source),
+                        "timestamp":timestamp,
+                        "game_time":game_time_seconds,
+                        "action":action_name,
+                        "action_count":1,
+                        "team_score":homeTeamScore,
+                        "opposition_score":awayTeamScore,
+                    }
+
+            update_list.append(update_dict)
+
+            try:
+                bulk_upsert_data(table='sports_action_pbp_live', data_dict=update_list, conflict_ids=['game_id','team_id','timestamp'],pg_config=pg_config)
+            except Exception as e:
+                print('Error',e)
+
+            print('\n')
+
+            print('sleeping for',delay_time)
+            #time.sleep(delay_time)
+
+    except:
+            print('Failed ')
+            FAILED.append(game_id)
+
+
+ACTIONS=list(set(ACTIONS))
+for i in ACTIONS:
+    print(i)
+
+print('\n')
+print('Game actions')
+GAME_ACTIONS=list(set(GAME_ACTIONS))
+for i in GAME_ACTIONS:
+    print(i)

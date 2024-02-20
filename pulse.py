@@ -13,13 +13,15 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 s3_client = boto3.client('s3')
+import requests
 #list the files in the location
 bucket_name='athstat-etl-migrated'
 
+generic_image_url='https://www.world.rugby/default/person-images-site/240/'
 
 
 
-option=''
+option='qa'
 if option=='prod':
 
     pg_config = {
@@ -413,8 +415,17 @@ for file_number in  range(len(games_file_dict['games'])):
                 roster = []
                 player_stats_list = []
 
+
+
                 for player in player_stats:
-                
+                    player_image_url=f'{generic_image_url}{player.get("player").get("id")}.png'
+                    #download images using and uplaod to S3
+                    player_image_path = f'logos/{generate_uuid(player.get("player").get("id"),data_source=data_source)}.png'
+                    S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
+                    player_image_data = requests.get(player_image_url).content
+                    s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
+
+                    
                     athlete_dict = {
                         "source_id": player.get('player').get('id'),
                         "tracking_id": generate_uuid(player.get('player').get('id'), data_source=data_source),
@@ -432,7 +443,8 @@ for file_number in  range(len(games_file_dict['games'])):
                         #question how does something like replacement end up with an Xp rating?
                         "date_of_birth":player.get('player').get('dob').get('label'),
                         "height":player.get('player').get('height'),
-                        "weight":player.get('player').get('weight')
+                        "weight":player.get('player').get('weight'),
+                        "image_url":S3_url
 
                     }
 

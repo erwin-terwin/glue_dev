@@ -18,23 +18,37 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option=''
+
+option='qa'
 if option=='prod':
+
     pg_config = {
-    'dbname': 'athstat_analytics_prod',
-    'user': 'postgres',
-    'password': 'J4VGzZwjfrcymkasdAsdkA',
-    'host': 'ec2-54-87-75-32.compute-1.amazonaws.com',
-    'port': 5432
-}
-elif option=='qa':
-    pg_config = {
-        'dbname': 'athstat_analytics_qa',
+        'dbname': 'athstat_games',
         'user': 'postgres',
-        'password': 'n4fn8s0Ffn4ssPx9Ujn4',
-        'host': 'ec2-44-202-156-120.compute-1.amazonaws.com',
+        'password': 'J4VGzZwjfrcymkasdAsdkA',
+        'host': 'athstat-analytics-prod-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
+
+elif option=='qa':
+    pg_config = {
+        'dbname': 'athstat_games',
+        'user': 'postgres',
+        'password': 'n4fn8s0Ffn4ssPx9Ujn4',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
+        'port': 5432
+    }
+
+
+elif option=='review':
+        pg_config = {
+        'dbname': 'prod_review_delete',
+        'user': 'postgres',
+        'password': 'J4VGzZwjfrcymkasdAsdkA',
+        'host': 'athstat-analytics-prod-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
+        'port': 5432
+    }
+
 else:
     pg_config = {
         'dbname': 'local_rds_prod',
@@ -43,6 +57,7 @@ else:
         'host': 'localhost',
         'port': 5432
     }
+
 
 def execute_query(query:str,pg_config:dict, values:list=None,bulk: bool=False)->None:
     """
