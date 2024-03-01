@@ -1,13 +1,3 @@
-"""
-Seed Postres Database
-
-
-
-
-"""
-
-
-
 
 import boto3
 import psycopg2
@@ -19,16 +9,19 @@ import pandas as pd
 import io
 from datetime import datetime, timedelta
 from datetime import datetime, timezone
+import requests
 # Initialize Glue client
 glue_client = boto3.client('glue', region_name='us-east-1')
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+s3_client = boto3.client('s3')
+#list the files in the location
+bucket_name='athstat-etl-migrated'
 
 
 
-
-option='prod'
+option=''
 if option=='prod':
 
     pg_config = {
@@ -41,7 +34,7 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_games_qa_review',
+        'dbname': 'athstat_games',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
         'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
@@ -66,11 +59,6 @@ else:
         'host': 'localhost',
         'port': 5432
     }
-
-
-
-
-
 
 
 def execute_query(query:str,pg_config:dict, values:list=None,bulk: bool=False)->None:
@@ -222,107 +210,113 @@ def read_s3_file(bucket_name:str, file_name:str)->str:
     return obj['Body'].read().decode('utf-8')
 
 
-print('Seeding RDS: ', pg_config['dbname'])
 
-
-
-
-organizations_list=[]
-
-organizations_list.append({
-    'name': 'World Rugby',
-    'location': 'Dublin, Ireland',    
-    'slug': 'wru',
-    'approved_name': 'World Rugby',
-    'id': '1',
-    'source_id': '1',
-    'possible_names': ['World Rugby', 'International Rugby Board', 'IRB'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-    
-
-organizations_list.append({
-    'name': 'Major League Rugby',
-    'location': 'Dallas, Texas',
-    'slug': 'mlr',
-    'approved_name': 'Major League Rugby',
-    'id': '6',
-    'source_id': '6',
-    'possible_names': ['Major League Rugby', 'MLR'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-organizations_list.append({
-    'name': 'National Womens Soccer League',
-    'location': 'Chicago, Illinois',
-    'slug': 'nwsl',
-    'approved_name': 'National Womens Soccer League',
-    'id': '3',
-    'source_id': '3',
-    'possible_names': ['National Womens Soccer League', 'NWSL'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-organizations_list.append({
-    'name': 'Major League Soccer',
-    'location': 'New York, New York',
-    'slug': 'mls',
-    'approved_name': 'Major League Soccer',
-    'id': '2',
-    'source_id': '2',
-    'possible_names': ['Major League Soccer', 'MLS'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-organizations_list.append({
-    'name':'NFL',   
-    'location': 'New York, New York',
-    'slug': 'nfl',
-    'approved_name': 'National Football League',
-    'id': '4',
-    'source_id': '4',
-    'possible_names': ['National Football League', 'NFL'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-organizations_list.append({
-    'name': 'Major League Soccer',
-    'location': 'New York, New York',
-    'slug': 'mlr',
-    'approved_name': 'Major League Soccer',
-    'id': '2',
-    'source_id': '2',
-    'possible_names': ['Major League Soccer', 'MLS'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-organizations_list.append({
-    'name': 'Football Association',
-    'location': 'London, England',
-    'slug': 'fa',
-    'approved_name': 'Football Association',
-    'id': '5',
-    'source_id': '5',
-    'possible_names': ['Football Association', 'FA'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-#seed organizations
-orgs=organizations_list
-for organizations_list in orgs:
+def read_table_into_dataframe(pg_config, table_name):
     try:
-        bulk_upsert_data('organizations', [organizations_list], ['id'],pg_config)
-        print('Organizations Seeded !')
+        # Connect to the PostgreSQL database
+        connection = psycopg2.connect(**pg_config)
+
+        # Build the SQL query dynamically using the `sql` module
+        query = sql.SQL("SELECT * FROM {}").format(
+            sql.Identifier(table_name)
+        )
+
+        # Use Pandas to read the query result into a DataFrame
+        df = pd.read_sql_query(query, connection)
+
+        return df
+
     except Exception as e:
-        print(e)
+        print(f"Error: {e}")
+
+    finally:
+        # Close the connection
+        if connection:
+            connection.close()
+
+
+def upsert_images(data_dict: dict, pg_config: dict) -> bool:
+    if not isinstance(data_dict, dict) or not data_dict:
+        raise Exception("Data must be a non-empty dictionary")
+
+    table = "your_images_table"  # Replace with your actual table name
+    columns = ', '.join(data_dict.keys())
+    placeholders = ', '.join(['%s'] * len(data_dict))
+    update_sql = ', '.join([f"{key} = EXCLUDED.{key}" for key in data_dict])
+
+    # Assuming 'tracking_id' is the key for upserting
+    sql_query = sql.SQL(
+        f"INSERT INTO {table} ({columns}) VALUES ({placeholders}) "
+        f"ON CONFLICT (tracking_id) "
+        f"DO UPDATE SET {update_sql}"
+    )
+
+    values = list(data_dict.values())
+
+    try:
+        execute_query(query=sql_query, values=values, pg_config=pg_config)
+        print(f"Upserted {table} successfully ID: {data_dict.get('tracking_id')}")
+        return True  # Upsert was successful
+    except Exception as e:
+        print(f"Error upserting {table} ID: {data_dict.get('tracking_id')}")
+        print(f"Error: {str(e)}")
+        return False  # Upsert was not successful
+
+
+print('Writing to RDS',pg_config['dbname'])
+print('\n')
+
+
+#read athleste table
+df=read_table_into_dataframe(pg_config,'athletes')
+df_images = df
+df_images = df
+#filter for data_source=incrowed
+df_images=df_images[df_images['data_source']=='incrowed']
+data_sources=df_images['data_source'].unique().tolist()
+print('Data Sources:',data_sources)
+print('\n')
+images_list=[]
+counter=0
+number_of_rows=len(df_images)
+for index, row in df_images.iterrows():
+    source_id=row['source_id']
+    tracking_id=row['tracking_id']
+    image_url=f'https://media-cdn.incrowdsports.com/{source_id}.png'
+    player_image_data = requests.get(image_url).content
+    player_image_path = f'logos/{tracking_id}.png'
+    s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
+    S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/logos/{tracking_id}.png'
+    print('Image uploaded to S3 !: Precentage Complete:',(counter/number_of_rows)*100)
+    
+    athlete_dict={
+                "source_id":row['source_id'],
+                "tracking_id":row['tracking_id'],
+                "player_name":row['player_name'],
+                "nick_name":row['nick_name'],
+                # "birth_country":None,
+                # "date_of_birth":None,
+                # "abbr":None,
+                "athstat_name":row['athstat_name'],
+                "athstat_firstname":row['athstat_firstname'],
+                "athstat_lastname":row['athstat_lastname'],
+              
+                "team_id":row['team_id'], 
+                # "age":None,
+                # "height":None,
+                # "weight":None,           
+              
+                "data_source":row['data_source'],
+                "position":row['position'],#map thiscc
+                'image_url':S3_url
+                # "positionName":player.get('positionName'),#map this
+    }
+    images_list.append(athlete_dict)
+    counter+=1
+
+
+
+
+#inset images
+bulk_upsert_data(table='athletes',data_dict= images_list, conflict_ids='tracking_id',pg_config=pg_config)
+print('Images inserted into RDS successfully!')

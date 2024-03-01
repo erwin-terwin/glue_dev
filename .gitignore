@@ -1,0 +1,10 @@
+#ignore local_images folder
+
+local_images/
+Countries
+data_checks
+data_maps
+*.png
+*.jpg
+downloaded_images/
+athstat_games_images/

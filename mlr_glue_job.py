@@ -50,7 +50,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option='qa'
+option=''
 if option=='prod':
 
     pg_config = {
@@ -287,9 +287,12 @@ rugby_15s_position_ontology_path="data_maps/rugby_15s_position_ontology.csv"
 rugby_15s_position_ontology_file=read_s3_file(bucket_name=bucket_name, file_name=rugby_15s_position_ontology_path)
 rugby_15s_position_ontology_df=pd.read_csv(io.StringIO(rugby_15s_position_ontology_file),sep=',')
 #choose mlr and athstat_position
+position_class_df=rugby_15s_position_ontology_df[['mlr','position_group']]
 rugby_15s_position_ontology_df=rugby_15s_position_ontology_df[['mlr','athstat_position']]
 #create position_ontology_dict
 position_ontology_dict=rugby_15s_position_ontology_df.set_index('mlr').to_dict()['athstat_position']
+#position_class_dict=
+position_class_dict=position_class_df.set_index('mlr').to_dict()['position_group']
 
 #------------------------------------------- processing the games -----------------------------------------------
 
@@ -574,9 +577,10 @@ for game_id in game_ids:
                     "athstat_middleinitial":None,
                     "team_id":generate_uuid(team_id,data_source=data_source),
                     "gender":'M',
-                    "position_class":None,#important one
+                    "position_class":position_class_dict[stats.get('startingNumber')],#important one
                     "data_source":data_source,
                     "position":position_ontology_dict[stats.get('startingNumber')],#important one to map
+                    
                     #question how does something like replacement end up with an Xp rating?
 
                 }
@@ -587,22 +591,17 @@ for game_id in game_ids:
                     "athlete_id":generate_uuid(stats.get('playerId'),data_source=data_source),
                 })
 
-                roster_dict={
-                    "_id":generate_uuid(generate_uuid(stats.get('playerId'),game_id),data_source=data_source),
-                    "player_number":stats.get('startingNumber'),
-                    "athlete_id":generate_uuid(stats.get('playerId'),data_source=data_source),
-                    "team_id":generate_uuid(team_id,data_source=data_source),
-                    "game_id":generate_uuid(game_id,data_source=data_source),
-                    "position":stats.get('startingNumber'),
-                }
 
 
-                roster.append(roster_dict)
+                is_substitue=False
+                
                 player_metrics=stats.get('metrics')
                 if player_metrics !=None:
                     for metric in player_metrics:
                         action_name=metric.get('name')
                         action_value=metric.get('value')
+                        if action_name=='Matches as Sub' and action_value==1:
+                            is_substitue=True
                         #if action value is float round to 2 decimal places
                         if isinstance(action_value,float):
                             action_value=round(action_value,2)
@@ -616,7 +615,21 @@ for game_id in game_ids:
                                     "team_id":generate_uuid(team_id,data_source=data_source),
                                     "data_source":data_source,
                                 })
-                    
+
+
+                        print('Substitute:  '+str(is_substitue))
+                        roster_dict={
+                            "_id":generate_uuid(generate_uuid(stats.get('playerId'),game_id),data_source=data_source),
+                            "player_number":stats.get('startingNumber'),
+                            "athlete_id":generate_uuid(stats.get('playerId'),data_source=data_source),
+                            "team_id":generate_uuid(team_id,data_source=data_source),
+                            "game_id":generate_uuid(game_id,data_source=data_source),
+                            "position":position_class_dict[stats.get('startingNumber')], #need to clarify between position and position_class
+                            "is_substitute":is_substitue,
+                            
+                        }
+                        roster.append(roster_dict)
+                            
 
         # processing match timeline
         team_pbp_actions_list=[]

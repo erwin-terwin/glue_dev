@@ -1,13 +1,3 @@
-"""
-Seed Postres Database
-
-
-
-
-"""
-
-
-
 
 import boto3
 import psycopg2
@@ -24,11 +14,13 @@ glue_client = boto3.client('glue', region_name='us-east-1')
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+s3_client = boto3.client('s3')
+#list the files in the location
+bucket_name='athstat-etl-migrated'
 
 
 
-
-option='prod'
+option=''
 if option=='prod':
 
     pg_config = {
@@ -41,7 +33,7 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_games_qa_review',
+        'dbname': 'athstat_games',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
         'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
@@ -68,6 +60,9 @@ else:
     }
 
 
+
+print('Writing to RDS',pg_config['dbname'])
+print('\n')
 
 
 
@@ -221,108 +216,60 @@ def read_s3_file(bucket_name:str, file_name:str)->str:
     logger.info(f'File read')
     return obj['Body'].read().decode('utf-8')
 
+folder='game_prediction_models'
+#read csv from S3
+file_name='xp_ratings_postgresql.csv'
+file_path=f'{folder}/{file_name}'
+file_content=read_s3_file(bucket_name, file_path)
+data = io.StringIO(file_content)
+df = pd.read_csv(data)
+print('Read xp_ratings_postgresql.csv')
 
-print('Seeding RDS: ', pg_config['dbname'])
+xp_ratings_dict={}
+xp_ratings_list=[]
+for index,row in df.iterrows():
+    print(row)
+    ratings_dict={
+        'sports_id':row['sports_id'],
+        'action':row['action'],
+        'xp_rating':row['xP_rating']
+    }
+    xp_ratings_list.append(ratings_dict)
 
 
+#bule upsert on sport_id
+bulk_upsert_data('xp_ratings',xp_ratings_list,['sports_id','action'],pg_config)
 
 
-organizations_list=[]
+#processing ingame_model_coefficients.csv
+file_name='in_game_model_coefficients.csv'
+file_path=f'{folder}/{file_name}'
+file_content=read_s3_file(bucket_name, file_path)
+data = io.StringIO(file_content)
+df = pd.read_csv(data)
+print('Read in_game_model_coefficients.csv')
 
-organizations_list.append({
-    'name': 'World Rugby',
-    'location': 'Dublin, Ireland',    
-    'slug': 'wru',
-    'approved_name': 'World Rugby',
-    'id': '1',
-    'source_id': '1',
-    'possible_names': ['World Rugby', 'International Rugby Board', 'IRB'],
-    'hidden': False,
-    'data_source': 'internal'
-})
+
+import re
+
+in_game_model_coefficients_list = []
+
+for index, row in df.iterrows():
+    array_values_str = row['values']
     
-
-organizations_list.append({
-    'name': 'Major League Rugby',
-    'location': 'Dallas, Texas',
-    'slug': 'mlr',
-    'approved_name': 'Major League Rugby',
-    'id': '6',
-    'source_id': '6',
-    'possible_names': ['Major League Rugby', 'MLR'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-organizations_list.append({
-    'name': 'National Womens Soccer League',
-    'location': 'Chicago, Illinois',
-    'slug': 'nwsl',
-    'approved_name': 'National Womens Soccer League',
-    'id': '3',
-    'source_id': '3',
-    'possible_names': ['National Womens Soccer League', 'NWSL'],
-    'hidden': False,
-    'data_source': 'internal'
-})
+    # Convert string representation of array to list of floats
+    array_values = [float(value) for value in re.findall(r'-?\d+\.\d+', array_values_str)]
+    
+    coefficients_dict = {
+        'sports_id': row['sport_id'],
+        'values': array_values,
+        'coefficient': row['coefficient'],
+        'competition_id': row['competition_id']
+    }
+    
+    in_game_model_coefficients_list.append(coefficients_dict)
 
 
-organizations_list.append({
-    'name': 'Major League Soccer',
-    'location': 'New York, New York',
-    'slug': 'mls',
-    'approved_name': 'Major League Soccer',
-    'id': '2',
-    'source_id': '2',
-    'possible_names': ['Major League Soccer', 'MLS'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-organizations_list.append({
-    'name':'NFL',   
-    'location': 'New York, New York',
-    'slug': 'nfl',
-    'approved_name': 'National Football League',
-    'id': '4',
-    'source_id': '4',
-    'possible_names': ['National Football League', 'NFL'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-organizations_list.append({
-    'name': 'Major League Soccer',
-    'location': 'New York, New York',
-    'slug': 'mlr',
-    'approved_name': 'Major League Soccer',
-    'id': '2',
-    'source_id': '2',
-    'possible_names': ['Major League Soccer', 'MLS'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-organizations_list.append({
-    'name': 'Football Association',
-    'location': 'London, England',
-    'slug': 'fa',
-    'approved_name': 'Football Association',
-    'id': '5',
-    'source_id': '5',
-    'possible_names': ['Football Association', 'FA'],
-    'hidden': False,
-    'data_source': 'internal'
-})
-
-
-#seed organizations
-orgs=organizations_list
-for organizations_list in orgs:
-    try:
-        bulk_upsert_data('organizations', [organizations_list], ['id'],pg_config)
-        print('Organizations Seeded !')
-    except Exception as e:
-        print(e)
+#bule upsert on sport_id
+bulk_upsert_data('in_game_model_coefficients',in_game_model_coefficients_list,\
+['sports_id','coefficient','competition_id'],pg_config)

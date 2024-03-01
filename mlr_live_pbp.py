@@ -51,7 +51,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option=''
+option='qa'
 if option=='prod':
 
     pg_config = {
@@ -64,7 +64,7 @@ if option=='prod':
 
 elif option=='qa':
     pg_config = {
-        'dbname': 'athstat_games_qa_review',
+        'dbname': 'athstat_games',
         'user': 'postgres',
         'password': 'n4fn8s0Ffn4ssPx9Ujn4',
         'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
@@ -279,7 +279,7 @@ standard_action_names_dict=standard_action_names_df.set_index(data_source_column
 
 #pick random game in games dictionary
 game_ids=list(games_dictionary.keys())
-game_ids=game_ids[0:1]
+# game_ids=game_ids[0:1]
 FAILED=[]
 ACTIONS=[]
 GAME_ACTIONS=[]
@@ -357,8 +357,15 @@ for game_id in game_ids:
             #remove whiute space
             action_name=action_name.replace(" ", "")
             ACTIONS.append(action_name)
+            if playerOne!=None:
+                player_id=generate_uuid(playerOne.get('playerId'),data_source)
+            elif playerTwo!=None:
+                player_id=generate_uuid(playerTwo.get('playerId'),data_source)
+            else:
+                continue
 
             update_dict={
+                        "athlete_id":player_id,
                         "game_id":generate_uuid(game_id,data_source),
                         "team_id":generate_uuid(team_id,data_source),
                         "timestamp":timestamp,
@@ -372,7 +379,7 @@ for game_id in game_ids:
             update_list.append(update_dict)
 
             try:
-                bulk_upsert_data(table='sports_action_pbp_live', data_dict=update_list, conflict_ids=['game_id','team_id','timestamp'],pg_config=pg_config)
+                bulk_upsert_data(table='sports_action_pbp_live', data_dict=update_list, conflict_ids=['athlete_id','game_id','team_id','timestamp'],pg_config=pg_config)
             except Exception as e:
                 print('Error',e)
 

@@ -12,6 +12,7 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 s3_client = boto3.client('s3')
+import requests
 #list the files in the location
 bucket_name='athstat-etl-migrated'
 
@@ -19,7 +20,7 @@ bucket_name='athstat-etl-migrated'
 
 
 
-option='qa'
+option=''
 if option=='prod':
 
     pg_config = {
@@ -220,192 +221,211 @@ data_source_column ="URC"
 position_ontology_df=position_ontology_df[[data_source_column,'Athstat action']]
 position_ontology_df=position_ontology_df.dropna(subset=[data_source_column])
 position_ontology_dict=position_ontology_df.set_index(data_source_column).to_dict()["Athstat action"]
+games=games_file_dict['games']
+for game_number in range(len(games)):
+            list_of_games = games_file_dict['games'][game_number]['endpoints']
+            path_to_file =list_of_games['prefix']
+            competition_id = list_of_games['competition_id']
+            competition_name = list_of_games['competition_name']
+            data_source = list_of_games['data_source']
+            league_name = list_of_games['league_name']
+            organization_id = list_of_games['organization_id']
+            season_end_date = list_of_games['season_end'].replace("‘", "'").replace("’", "'")
+            season_start_date = list_of_games['season_start'].replace("‘", "'").replace("’", "'")
+            sport_id = list_of_games['sport_id']
+            sport_name = list_of_games['sport_name']
 
 
-list_of_games = games_file_dict['games'][0]['endpoints']
-path_to_file =list_of_games['prefix']
-competition_id = list_of_games['competition_id']
-competition_name = list_of_games['competition_name']
-data_source = list_of_games['data_source']
-league_name = list_of_games['league_name']
-organization_id = list_of_games['organization_id']
-season_end_date = list_of_games['season_end'].replace("‘", "'").replace("’", "'")
-season_start_date = list_of_games['season_start'].replace("‘", "'").replace("’", "'")
-sport_id = list_of_games['sport_id']
-sport_name = list_of_games['sport_name']
 
+            game_file = json.loads(read_s3_file(bucket_name, path_to_file) ).get('data',{})
 
-
-game_file = json.loads(read_s3_file(bucket_name, path_to_file) ).get('data',{})
-
-sport = {
-        "id": sport_id,
-        "name": sport_name,
-        "games_supported": True
-    }
-
-competition = {
-        "id": competition_id,
-        "name": competition_name,
-        "sport_id": sport_id,
-        "organization_id": organization_id,
-    }
-
-season_dict={
-                "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
-                "name": league_name,
-                "start_date": season_start_date,
-                "end_date": season_end_date,
-                'data_source': data_source,
-                "competition_id": competition_id,
+            sport = {
+                    "id": sport_id,
+                    "name": sport_name,
+                    "games_supported": True
                 }
 
-
-leagues_dict={
-                    "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
-                    "name": league_name,
-                    "season_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
-                    "start_date": season_start_date,
-                    "end_date": season_end_date
+            competition = {
+                    "id": competition_id,
+                    "name": competition_name,
+                    "sport_id": sport_id,
+                    "organization_id": organization_id,
                 }
 
-
-teams_dict_home={
-    "athstat_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
-    "source_id":game_file.get('homeTeam').get("id") ,
-    "athstat_name": game_file.get('homeTeam').get("name"),
-    "data_source": data_source,
-    "source_abbreviation": game_file.get('homeTeam').get("shortName"),
-    "athstat_abbreviation": game_file.get('homeTeam').get("shortName"),
-    "sport_id": sport_id,
-    "organization_id": organization_id,
-}   
-
-teams_dict_away={
-    "athstat_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
-    "source_id":game_file.get('awayTeam').get("id") ,
-    "athstat_name": game_file.get('awayTeam').get("name"),
-    "data_source": data_source,
-    "source_abbreviation": game_file.get('awayTeam').get("shortName"),
-    "athstat_abbreviation": game_file.get('awayTeam').get("shortName"),
-    "sport_id": sport_id,
-    "organization_id": organization_id,
-}
-all_teams = [teams_dict_home,teams_dict_away]
-
-games_seasons_dict={
-    "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
-    "team_score": game_file.get('homeTeam').get("score"),
-    "opposition_score": game_file.get('awayTeam').get("score"),
-    "venue": game_file.get('venue').get("name"),
-    "kickoff_time": game_file.get('date'),
-    "competition_name": competition_name,
-    "team_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
-    "opposition_team_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
-    "league_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
-    "round": game_file.get('round'),
-    "game_status": game_file.get('status'),#map this
-}
-
-team_actions_list=[]
-for action_name in game_file.get('homeTeam').get("stats").keys():
-    action_name_ontology = position_ontology_dict.get(action_name,{})
-    if action_name_ontology != {}:
-        team_actions_list.append({
-            "action": action_name_ontology,
-            "action_count": game_file.get('homeTeam').get("stats").get(action_name),
-            "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
-            "team_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
-        })
-    else:
-        logger.info(f'No mapping for {action_name}')
-        continue
-for action_name in game_file.get('awayTeam').get("stats").keys():
-    action_name_ontology = position_ontology_dict.get(action_name,{})
-    if action_name_ontology != {}:
-        team_actions_list.append({
-            "action": action_name_ontology,
-            "action_count": game_file.get('awayTeam').get("stats").get(action_name),
-            "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
-            "team_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
-        })
-    else:
-        logger.info(f'No mapping for {action_name}')
-        continue
+            season_dict={
+                            "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                            "name": league_name,
+                            "start_date": season_start_date,
+                            "end_date": season_end_date,
+                            'data_source': data_source,
+                            "competition_id": competition_id,
+                            }
 
 
-
-player_stats = []
-athlete_data=[]
-team_athletes=[]
-roster=[]
-list_of_teams=["homeTeam","awayTeam"]
-
-for team_obj in list_of_teams:
-    for player in game_file.get(team_obj).get('players'):
-        athlete_dict={
-            "source_id":player.get('id'),
-            "tracking_id":generate_uuid(player.get('id'),data_source=data_source),
-            "player_name":player.get('name'),
-            "nick_name":player.get('known'),
-            # "birth_country":None,
-            # "date_of_birth":None,
-            # "abbr":None,
-            "athstat_name":player.get('name'),
-            "athstat_firstname":player.get('firstName'),
-            "athstat_lastname":player.get('lastName'),
-            "athstat_middleinitial":None,
-            "team_id":generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source), 
-            # "age":None,
-            # "height":None,
-            # "weight":None,
-            "gender":"M",
-            "position_class":None,
-            "data_source":data_source,
-            "position":player.get('positionName'),#map this
-            # "positionName":player.get('positionName'),#map this
-        }
-        athlete_data.append(athlete_dict)
-        team_athletes.append({
-            "team_id":generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source), 
-            "athlete_id":generate_uuid(player.get('id'),data_source=data_source),
-        })
-        roster_dict={
-                    "player_number": player.get('positionId'),
-                    "athlete_id": generate_uuid(player.get('id'),data_source=data_source),
-                    "team_id": generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source),
-                    "game_id": generate_uuid(game_file.get('id'),data_source=data_source),
-                    "position": player.get('positionName'),
-                    # "is_substitute": False,
-                }
-        roster.append(roster_dict)
-        for action_name in player.get('stats'):
-            action_name_ontology = position_ontology_dict.get(action_name,{})
-            # if action name in nan then skip
-            if action_name_ontology != {} and player.get('stats').get(action_name) != None:
-                player_stats.append({
-                            'action': action_name_ontology,
-                            'action_count': player.get('stats').get(action_name),
-                            'game_id': generate_uuid(game_file.get('id'),data_source=data_source),
-                            'team_id': generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source),
-                            'athlete_id': generate_uuid(player.get('id'),data_source=data_source),
-                            "data_source": data_source,
-                        })
-
-upsert_data(table='sports', data_dict=sport, conflict_ids='id',pg_config=pg_config)
-upsert_data(table='competitions', data_dict=competition, conflict_ids='id',pg_config=pg_config)
-upsert_data(table='seasons', data_dict=season_dict, conflict_ids='id',pg_config=pg_config)
-upsert_data(table='leagues', data_dict=leagues_dict, conflict_ids='id',pg_config=pg_config)
-upsert_data(table='teams', data_dict=teams_dict_home, conflict_ids='athstat_id',pg_config=pg_config)
-upsert_data(table='teams', data_dict=teams_dict_away, conflict_ids='athstat_id',pg_config=pg_config)
-upsert_data(table='games_seasons', data_dict=games_seasons_dict, conflict_ids='game_id',pg_config=pg_config)
-
-bulk_upsert_data(table='team_actions', data_dict=team_actions_list, conflict_ids=['game_id', 'team_id', 'action'],pg_config=pg_config)
-bulk_upsert_data(table='athletes',data_dict= athlete_data, conflict_ids='tracking_id',pg_config=pg_config)
-bulk_upsert_data(table='teams_athletes', data_dict=team_athletes, conflict_ids=['athlete_id', 'team_id'],pg_config=pg_config)
-bulk_upsert_data(table='game_roster', data_dict=roster, conflict_ids=['athlete_id', 'game_id', 'team_id'],pg_config=pg_config)
-bulk_upsert_data(table='sports_action', data_dict=player_stats, conflict_ids=['game_id', 'team_id', 'athlete_id', 'action'],pg_config=pg_config)
+            leagues_dict={
+                                "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                                "name": league_name,
+                                "season_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                                "start_date": season_start_date,
+                                "end_date": season_end_date
+                            }
 
 
-print('\n')
-print('Updates complete!')
+            teams_dict_home={
+                "athstat_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
+                "source_id":game_file.get('homeTeam').get("id") ,
+                "athstat_name": game_file.get('homeTeam').get("name"),
+                "data_source": data_source,
+                "source_abbreviation": game_file.get('homeTeam').get("shortName"),
+                "athstat_abbreviation": game_file.get('homeTeam').get("shortName"),
+                "sport_id": sport_id,
+                "organization_id": organization_id,
+            }   
+
+            teams_dict_away={
+                "athstat_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
+                "source_id":game_file.get('awayTeam').get("id") ,
+                "athstat_name": game_file.get('awayTeam').get("name"),
+                "data_source": data_source,
+                "source_abbreviation": game_file.get('awayTeam').get("shortName"),
+                "athstat_abbreviation": game_file.get('awayTeam').get("shortName"),
+                "sport_id": sport_id,
+                "organization_id": organization_id,
+            }
+            all_teams = [teams_dict_home,teams_dict_away]
+
+            games_seasons_dict={
+                "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
+                "team_score": game_file.get('homeTeam').get("score"),
+                "opposition_score": game_file.get('awayTeam').get("score"),
+                "venue": game_file.get('venue').get("name"),
+                "kickoff_time": game_file.get('date'),
+                "competition_name": competition_name,
+                "team_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
+                "opposition_team_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
+                "league_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                "round": game_file.get('round'),
+                "game_status": game_file.get('status'),#map this
+            }
+
+            team_actions_list=[]
+            for action_name in game_file.get('homeTeam').get("stats").keys():
+                action_name_ontology = position_ontology_dict.get(action_name,{})
+                if action_name_ontology != {}:
+                    team_actions_list.append({
+                        "action": action_name_ontology,
+                        "action_count": game_file.get('homeTeam').get("stats").get(action_name),
+                        "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
+                        "team_id":generate_uuid(game_file.get('homeTeam').get("id"),data_source=data_source) ,
+                    })
+                else:
+                    logger.info(f'No mapping for {action_name}')
+                    continue
+            for action_name in game_file.get('awayTeam').get("stats").keys():
+                action_name_ontology = position_ontology_dict.get(action_name,{})
+                if action_name_ontology != {}:
+                    team_actions_list.append({
+                        "action": action_name_ontology,
+                        "action_count": game_file.get('awayTeam').get("stats").get(action_name),
+                        "game_id":generate_uuid(game_file.get('id'),data_source=data_source) ,
+                        "team_id":generate_uuid(game_file.get('awayTeam').get("id"),data_source=data_source) ,
+                    })
+                else:
+                    logger.info(f'No mapping for {action_name}')
+                    continue
+
+
+
+            player_stats = []
+            athlete_data=[]
+            team_athletes=[]
+            roster=[]
+            list_of_teams=["homeTeam","awayTeam"]
+
+            for team_obj in list_of_teams:
+                for player in game_file.get(team_obj).get('players'):
+                    try:
+                        image_url=player.get('imageUrl')
+                        print(image_url)
+                        genetated_id=generate_uuid(player.get('id'),data_source=data_source)
+                        player_image_path=f'{genetated_id}.png'
+                        player_image_data = requests.get(image_url).content
+                        s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
+                        S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
+                        print('Image uploaded to S3 !')
+                        print('\n')
+
+                    except Exception as e:
+                        print(e)
+                        print('Image not processed !')
+                        S3_url=None
+
+
+                    print(S3_url)
+                    athlete_dict={
+                        "source_id":player.get('id'),
+                        "tracking_id":generate_uuid(player.get('id'),data_source=data_source),
+                        "player_name":player.get('name'),
+                        "nick_name":player.get('known'),
+                        # "birth_country":None,
+                        # "date_of_birth":None,
+                        # "abbr":None,
+                        "athstat_name":player.get('name'),
+                        "athstat_firstname":player.get('firstName'),
+                        "athstat_lastname":player.get('lastName'),
+                        "athstat_middleinitial":None,
+                        "team_id":generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source), 
+                        # "age":None,
+                        # "height":None,
+                        # "weight":None,
+                        "gender":"M",
+                        "position_class":None,
+                        "data_source":data_source,
+                        "position":player.get('positionName'),#map this
+                        "image_url":S3_url
+                        # "positionName":player.get('positionName'),#map this
+                    }
+                    athlete_data.append(athlete_dict)
+                    team_athletes.append({
+                        "team_id":generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source), 
+                        "athlete_id":generate_uuid(player.get('id'),data_source=data_source),
+                    })
+                    roster_dict={
+                                "player_number": player.get('positionId'),
+                                "athlete_id": generate_uuid(player.get('id'),data_source=data_source),
+                                "team_id": generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source),
+                                "game_id": generate_uuid(game_file.get('id'),data_source=data_source),
+                                "position": player.get('positionName'),
+                                # "is_substitute": False,
+                            }
+                    roster.append(roster_dict)
+                    for action_name in player.get('stats'):
+                        action_name_ontology = position_ontology_dict.get(action_name,{})
+                        # if action name in nan then skip
+                        if action_name_ontology != {} and player.get('stats').get(action_name) != None:
+                            player_stats.append({
+                                        'action': action_name_ontology,
+                                        'action_count': player.get('stats').get(action_name),
+                                        'game_id': generate_uuid(game_file.get('id'),data_source=data_source),
+                                        'team_id': generate_uuid(game_file.get(team_obj).get("id"),data_source=data_source),
+                                        'athlete_id': generate_uuid(player.get('id'),data_source=data_source),
+                                        "data_source": data_source,
+                                    })
+
+            upsert_data(table='sports', data_dict=sport, conflict_ids='id',pg_config=pg_config)
+            upsert_data(table='competitions', data_dict=competition, conflict_ids='id',pg_config=pg_config)
+            upsert_data(table='seasons', data_dict=season_dict, conflict_ids='id',pg_config=pg_config)
+            upsert_data(table='leagues', data_dict=leagues_dict, conflict_ids='id',pg_config=pg_config)
+            upsert_data(table='teams', data_dict=teams_dict_home, conflict_ids='athstat_id',pg_config=pg_config)
+            upsert_data(table='teams', data_dict=teams_dict_away, conflict_ids='athstat_id',pg_config=pg_config)
+            upsert_data(table='games_seasons', data_dict=games_seasons_dict, conflict_ids='game_id',pg_config=pg_config)
+
+            bulk_upsert_data(table='team_actions', data_dict=team_actions_list, conflict_ids=['game_id', 'team_id', 'action'],pg_config=pg_config)
+            bulk_upsert_data(table='athletes',data_dict= athlete_data, conflict_ids='tracking_id',pg_config=pg_config)
+            bulk_upsert_data(table='teams_athletes', data_dict=team_athletes, conflict_ids=['athlete_id', 'team_id'],pg_config=pg_config)
+            bulk_upsert_data(table='game_roster', data_dict=roster, conflict_ids=['athlete_id', 'game_id', 'team_id'],pg_config=pg_config)
+            bulk_upsert_data(table='sports_action', data_dict=player_stats, conflict_ids=['game_id', 'team_id', 'athlete_id', 'action'],pg_config=pg_config)
+
+
+            print('\n')
+            print('Updates complete!')

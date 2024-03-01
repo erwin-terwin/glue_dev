@@ -44,10 +44,10 @@ elif option=='qa':
 
 elif option=='review':
         pg_config = {
-        'dbname': 'prod_review_delete',
+        'dbname': 'athstat_games_qa_review',
         'user': 'postgres',
         'password': 'J4VGzZwjfrcymkasdAsdkA',
-        'host': 'athstat-analytics-prod-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
+        'host': 'athstat-analytics-qa-postgresql.cfmehnnvb5ym.us-east-1.rds.amazonaws.com',
         'port': 5432
     }
 
@@ -217,7 +217,7 @@ def read_s3_file(bucket_name:str, file_name:str)->str:
     return obj['Body'].read().decode('utf-8')
 
 
-yaml_file_path='data_maps/pulse_live.yaml'
+yaml_file_path='data_maps/pulse_live_games.yaml'
 yaml_file = read_s3_file(bucket_name, yaml_file_path)
 games_file_dict = yaml.safe_load(yaml_file)
 
@@ -230,19 +230,39 @@ standard_action_names_df=standard_action_names_df[[data_source_column,'Athstat a
 standard_action_names_df=standard_action_names_df.dropna(subset=[data_source_column])
 standard_action_names_dict=standard_action_names_df.set_index(data_source_column).to_dict()["Athstat action"]
 
+
+#rubgy_15s_pisition_mapping
+position_mapping_path="data_maps/rugby_15s_position_ontology.csv"
+position_mapping_file = read_s3_file(bucket_name, position_mapping_path)
+position_mapping_df = pd.read_csv(io.StringIO(position_mapping_file), sep=',')
+pulse_sevens_df=position_mapping_df[['pulselive_position_sevens','athstat_position','position_group']]
+
+position_dict=pulse_sevens_df.set_index('pulselive_position_sevens').to_dict()["athstat_position"]
+position_group_dict=pulse_sevens_df.set_index('pulselive_position_sevens').to_dict()["position_group"]
+
+
 for file_number in  range(len(games_file_dict['games'])):
             list_of_games = games_file_dict['games'][file_number]['endpoints']
             path_to_file =list_of_games['prefix']
             competition_id = list_of_games['competition_id']
             competition_name = list_of_games['competition_name']
             data_source = list_of_games['data_source']
-            # league_name = list_of_games['league_name']
+            league_name = list_of_games['league_name']
             organization_id = list_of_games['organization_id']
+            organization_name = list_of_games['organization_name']
             season_end_date = list_of_games['season_end'].replace("‘", "'").replace("’", "'")
             season_start_date = list_of_games['season_start'].replace("‘", "'").replace("’", "'")
             sport_id = list_of_games['sport_id']
             sport_name = list_of_games['sport_name']
-
+            league_start=list_of_games['league_start']
+            league_end=list_of_games['league_end']
+            source_season_id=list_of_games['source_season_id']
+            source_league_id=list_of_games['source_league_id']
+            if sport_id!=3:
+                print('Not Sevens Rugby')
+                continue
+            else:
+                print('Sevens Rugby')
 
             #get game_id
             subfolder=list_of_games['prefix']
@@ -252,8 +272,7 @@ for file_number in  range(len(games_file_dict['games'])):
 
             match_details=game_file.get('match')
             events=match_details.get('events')
-            league_name=events[0].get('label')
-
+            
 
 
 
@@ -293,11 +312,13 @@ for file_number in  range(len(games_file_dict['games'])):
                                 "name": league_name,
                                 "season_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
                                 "start_date": season_start_date,
-                                "end_date": season_end_date
+                                "end_date": season_end_date,
+                                "source_season_id": source_season_id,
+                                "source_league_id": source_league_id
                             }
 
 
-
+            league_id=generate_uuid(game_file.get('season'),data_source=data_source) 
 
 
             team_data=game_file.get('teamStats')
@@ -336,7 +357,7 @@ for file_number in  range(len(games_file_dict['games'])):
                 "sport_id": sport_id,
                 "organization_id": organization_id,
             }  
-
+            #teamues league
 
 
             #away team dicitonary
@@ -420,11 +441,15 @@ for file_number in  range(len(games_file_dict['games'])):
                 for player in player_stats:
                     player_image_url=f'{generic_image_url}{player.get("player").get("id")}.png'
                     #download images using and uplaod to S3
-                    player_image_path = f'logos/{generate_uuid(player.get("player").get("id"),data_source=data_source)}.png'
-                    S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
-                    player_image_data = requests.get(player_image_url).content
-                    s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
-
+                    try:
+                        player_image_path = f'logos/{generate_uuid(player.get("player").get("id"),data_source=data_source)}.png'
+                        S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
+                        player_image_data = requests.get(player_image_url).content
+                        s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
+                    except:
+                        S3_url=None
+                    position=position_dict.get(player.get('positionLabel'))
+                    position_class=position_group_dict.get(position)
                     
                     athlete_dict = {
                         "source_id": player.get('player').get('id'),
@@ -437,9 +462,9 @@ for file_number in  range(len(games_file_dict['games'])):
                         "athstat_middleinitial":None,
                         "team_id":generate_uuid(team_id,data_source=data_source),
                         "gender":player.get('player').get('gender'),
-                        "position_class":None,#important one
+                        "position_class":position_class,#important one"
                         "data_source":data_source,
-                        "position":player.get('position'),#important one to map
+                        "position":position,#important one to map
                         #question how does something like replacement end up with an Xp rating?
                         "date_of_birth":player.get('player').get('dob').get('label'),
                         "height":player.get('player').get('height'),
@@ -452,6 +477,7 @@ for file_number in  range(len(games_file_dict['games'])):
                     team_athletes.append({
                         "team_id": generate_uuid(team_id, data_source=data_source),
                         "athlete_id": generate_uuid(player.get('player').get('id'), data_source=data_source),
+
                     })
 
                     roster_dict = {
@@ -459,7 +485,7 @@ for file_number in  range(len(games_file_dict['games'])):
                         "athlete_id": generate_uuid(player.get('player').get('id'), data_source=data_source),
                         "team_id": generate_uuid(team_id, data_source=data_source),
                         "game_id": generate_uuid(match_id, data_source=data_source),
-                        "position": player.get('positionLabel'),
+                        "position": position_class, #model is using position_class instead of position                     
                         "is_substitute": player.get('player').get('isReplacement'),
                     }
 
