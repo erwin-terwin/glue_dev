@@ -258,11 +258,11 @@ for file_number in  range(len(games_file_dict['games'])):
             league_end=list_of_games['league_end']
             source_season_id=list_of_games['source_season_id']
             source_league_id=list_of_games['source_league_id']
-            if sport_id!=3:
-                print('Not Sevens Rugby')
-                continue
-            else:
-                print('Sevens Rugby')
+            # if sport_id!=3:
+            #     print('Not Sevens Rugby')
+            #     continue
+            # else:
+            #     print('Sevens Rugby')
 
             #get game_id
             subfolder=list_of_games['prefix']
@@ -294,7 +294,7 @@ for file_number in  range(len(games_file_dict['games'])):
 
 
             season_dict={
-                            "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                            "id":generate_uuid(list_of_games.get('source_season_id'),data_source=data_source) ,
                             "name": league_name,
                             "start_date": season_start_date,
                             "end_date": season_end_date,
@@ -308,9 +308,9 @@ for file_number in  range(len(games_file_dict['games'])):
 
 
             leagues_dict={
-                                "id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                                "id":generate_uuid(list_of_games.get('source_league_id'),data_source=data_source) ,
                                 "name": league_name,
-                                "season_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                                "season_id":generate_uuid(list_of_games.get('source_season_id'),data_source=data_source) ,
                                 "start_date": season_start_date,
                                 "end_date": season_end_date,
                                 "source_season_id": source_season_id,
@@ -318,7 +318,7 @@ for file_number in  range(len(games_file_dict['games'])):
                             }
 
 
-            league_id=generate_uuid(game_file.get('season'),data_source=data_source) 
+            league_id=generate_uuid(list_of_games.get('source_league_id'),data_source=data_source)  
 
 
             team_data=game_file.get('teamStats')
@@ -389,7 +389,7 @@ for file_number in  range(len(games_file_dict['games'])):
                 "competition_name": competition_name,
                 "team_id":generate_uuid(home_team_id,data_source=data_source) ,
                 "opposition_team_id":generate_uuid(away_team_id,data_source=data_source) ,
-                "league_id":generate_uuid(game_file.get('season'),data_source=data_source) ,
+                "league_id":generate_uuid(list_of_games.get('source_league_id'),data_source=data_source) ,
                 "round": game_file.get('round'),
                 "game_status":'Complete',#map this
             }
@@ -439,15 +439,15 @@ for file_number in  range(len(games_file_dict['games'])):
 
 
                 for player in player_stats:
-                    player_image_url=f'{generic_image_url}{player.get("player").get("id")}.png'
-                    #download images using and uplaod to S3
-                    try:
-                        player_image_path = f'logos/{generate_uuid(player.get("player").get("id"),data_source=data_source)}.png'
-                        S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
-                        player_image_data = requests.get(player_image_url).content
-                        s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
-                    except:
-                        S3_url=None
+                    # player_image_url=f'{generic_image_url}{player.get("player").get("id")}.png'
+                    # #download images using and uplaod to S3
+                    # try:
+                    #     player_image_path = f'logos/{generate_uuid(player.get("player").get("id"),data_source=data_source)}.png'
+                    #     S3_url = f'https://athstat-landing-assets-migrated.s3.amazonaws.com/{player_image_path}'
+                    #     player_image_data = requests.get(player_image_url).content
+                    #     s3_client.put_object(Body=player_image_data, Bucket='athstat-landing-assets-migrated', Key=player_image_path)
+                    # except:
+                    #     S3_url=None
                     position=position_dict.get(player.get('positionLabel'))
                     position_class=position_group_dict.get(position)
                     
@@ -469,7 +469,7 @@ for file_number in  range(len(games_file_dict['games'])):
                         "date_of_birth":player.get('player').get('dob').get('label'),
                         "height":player.get('player').get('height'),
                         "weight":player.get('player').get('weight'),
-                        "image_url":S3_url
+                        # "image_url":S3_url
 
                     }
 
